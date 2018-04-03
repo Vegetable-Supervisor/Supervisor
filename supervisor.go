@@ -2,14 +2,18 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
 type Supervisor struct {
-	usn      string // unique service name
-	st       string // service type
-	location string // location
-	server   string // server
+	usn         string              // unique service name
+	st          string              // service type
+	location    string              // location
+	server      string              // server
+	greenhouses []GreenHouse        // connected GreenHouses
+	pending     []PendingGreenHouse // approval pending GreenHouses
+	mutex       *sync.Mutex         // for concurrent access of the greenhouses
 }
 
 func NewSupervisor(location string) Supervisor {
@@ -18,5 +22,6 @@ func NewSupervisor(location string) Supervisor {
 		st:       "vegetable-supervisor",
 		location: location,
 		server:   "vegetable-supervisor",
+		mutex:    &sync.Mutex{},
 	}
 }
