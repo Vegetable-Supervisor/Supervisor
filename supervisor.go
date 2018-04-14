@@ -125,6 +125,21 @@ func (sv *Supervisor) pendingHandler(w http.ResponseWriter, r *http.Request) {
 func (sv *Supervisor) infoHandler(w http.ResponseWriter, r *http.Request) {
 	queryValues := r.URL.Query()
 
+	if r.Method == "POST" {
+		// configuration update
+		if err := r.ParseForm(); err != nil {
+			fmt.Fprintf(w, "error parsing form in /info: %v", err)
+			return
+		}
+
+		// TODO
+		//
+		// newConfiguration := Configuration {
+		// 	Name:
+		// 	Description:
+		// }
+	}
+
 	ghId, err := strconv.ParseUint(queryValues.Get("id"), 0, 64)
 	if err != nil {
 		http.Error(w, "bad greenhouse id.", http.StatusNotFound)
@@ -132,8 +147,13 @@ func (sv *Supervisor) infoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sv.mutex.Lock()
-	_, ok := sv.greenhouses[ghId]
+	gh, ok := sv.greenhouses[ghId]
 	sv.mutex.Unlock()
+
+	if !ok {
+		http.Error(w, "404 not found.", http.StatusNotFound)
+		return
+	}
 
 	if !ok {
 		// not in accepted greenhouses, might be pending
@@ -141,7 +161,20 @@ func (sv *Supervisor) infoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "OK :)")
+	cnf, err := gh.getConfiguration()
+	if err != nil {
+		log.Fatalf("could not retrieve configuration: %v", err)
+		return
+	}
+
+	pageTemplate := template.Must(template.ParseFiles("public/templates/information.html"))
+	err = pageTemplate.Execute(w, GreenHouseInformation{
+		GreenHouse:    gh,
+		Configuration: cnf,
+	})
+	if err != nil {
+		log.Fatalf("could not execute template: %v", err)
+	}
 
 }
 
