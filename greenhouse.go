@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -82,6 +83,33 @@ func (gh *GreenHouse) getConfiguration() (Configuration, error) {
 	}
 
 	return cnf, nil
+}
+
+func (gh *GreenHouse) pushConfiguration(cnf Configuration) error {
+	url := fmt.Sprintf("https://%s:%d/push_configuration", gh.Ip, gh.Port)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+
+	//serialize Configuration to JSON
+	data, err := json.Marshal(cnf)
+
+	if err != nil {
+		return fmt.Errorf("could not encode Configuration to JSON: %v", err)
+	}
+
+	resp, err := client.Post(url, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("error could not perfom post request to greenhouse: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println(resp.Status)
+		return fmt.Errorf("error post request has not been processed at greenhouse: %v", err)
+	}
+
+	return nil
 }
 
 // A PendingGreenHouse is a GreenHouse that has not yet been accepted

@@ -1,24 +1,27 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"time"
 
-	ssdp "github.com/koron/go-ssdp"
+	ssdp "github.com/bcurren/go-ssdp"
 )
 
-func (sv *Supervisor) SSDPAdvertiser() {
-	_, err := ssdp.Advertise(
-		sv.st,       // send as "ST"
-		sv.usn,      // send as "USN"
-		sv.location, // send as "LOCATION"
-		sv.server,   // send as "SERVER"
-		0)
+func (sv *Supervisor) SSDPLookup() error {
+	offers, err := ssdp.Search("greenhouse", 3*time.Second)
 
 	if err != nil {
-		log.Fatalf("could not setup discover handler: %v", err)
+		return fmt.Errorf("error during SSDP lookup: %v", err)
 	}
 
-	// run Advertiser infinitely.
-	quit := make(chan bool)
-	<-quit
+	for _, offer := range offers {
+		// fmt.Println(offer.Location)
+		// fmt.Println(offer.ResponseAddr)
+		ipaddr := offer.ResponseAddr.IP.String()
+		port := offer.Location.Port()
+		url := fmt.Sprintf("https://%s:%s", ipaddr, port)
+		fmt.Println(url)
+	}
+
+	return nil
 }

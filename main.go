@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
-	"net/http"
 )
 
 func main() {
@@ -14,30 +12,25 @@ func main() {
 
 	sv := NewSupervisor(addr)
 
-	// register route handlers
+	err := sv.SSDPLookup()
+	fmt.Println(err)
 
-	// default handler
-	// http.Handle("/", http.FileServer(http.Dir("public/")))
-
-	// index
-	http.HandleFunc("/", sv.homeHandler)
-
-	// pending greenhouses page
-	http.HandleFunc("/pending", sv.pendingHandler)
-
-	// info
-	http.HandleFunc("/info", sv.infoHandler)
-
-	// Special Purpose Handlers
-
-	// join request handler
-	http.HandleFunc("/join", sv.joinHandler)
-
-	http.HandleFunc("/camera", sv.getPictureHandler)
-
-	log.Printf("Starting SSDP advertisement as %s", sv.usn)
-	go sv.SSDPAdvertiser()
-
-	log.Printf("Starting HTTP Server at %s", addr)
-	http.ListenAndServe(addr, nil)
+	// // index page
+	// http.HandleFunc("/", sv.homeHandler)
+	//
+	// // pending greenhouses page
+	// http.HandleFunc("/pending", sv.pendingHandler)
+	//
+	// // info
+	// http.HandleFunc("/info", sv.infoHandler)
+	//
+	// // join request handler
+	// http.HandleFunc("/join", sv.joinHandler)
+	//
+	// http.HandleFunc("/camera", sv.getPictureHandler)
+	//
+	// http.HandleFunc("/push_configuration", sv.pushConfigurationHandler)
+	//
+	// log.Printf("Starting HTTP Server at %s", addr)
+	// http.ListenAndServe(addr, nil)
 }

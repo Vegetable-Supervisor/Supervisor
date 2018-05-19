@@ -8,14 +8,9 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
-	"time"
 )
 
 type Supervisor struct {
-	usn                string                       // unique service name
-	st                 string                       // service type
-	location           string                       // location
-	server             string                       // server
 	greenhouses        map[uint64]GreenHouse        // connected GreenHouses
 	pending            map[uint64]PendingGreenHouse // approval pending GreenHouses
 	mutex              *sync.Mutex                  // for concurrent access of the greenhouses
@@ -24,10 +19,6 @@ type Supervisor struct {
 
 func NewSupervisor(location string) Supervisor {
 	return Supervisor{
-		usn:                fmt.Sprintf("vegetable-supervisor-%v", time.Now().Unix()),
-		st:                 "vegetable-supervisor",
-		location:           location,
-		server:             "vegetable-supervisor",
 		greenhouses:        make(map[uint64]GreenHouse),
 		pending:            make(map[uint64]PendingGreenHouse),
 		mutex:              &sync.Mutex{},
@@ -122,23 +113,54 @@ func (sv *Supervisor) pendingHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (sv *Supervisor) infoHandler(w http.ResponseWriter, r *http.Request) {
+func (sv *Supervisor) pushConfigurationHandler(w http.ResponseWriter, r *http.Request) {
 	queryValues := r.URL.Query()
 
-	if r.Method == "POST" {
-		// configuration update
-		if err := r.ParseForm(); err != nil {
-			fmt.Fprintf(w, "error parsing form in /info: %v", err)
-			return
-		}
-
-		// TODO
-		//
-		// newConfiguration := Configuration {
-		// 	Name:
-		// 	Description:
-		// }
+	ghId, err := strconv.ParseUint(queryValues.Get("id"), 0, 64)
+	if err != nil {
+		http.Error(w, "bad greenhouse id.", http.StatusNotFound)
+		return
 	}
+	sv.mutex.Lock()
+	gh, ok := sv.greenhouses[ghId]
+	sv.mutex.Unlock()
+
+	if !ok {
+		// not in accepted greenhouses, might be pending
+		http.Error(w, "greenhouse does not exist", http.StatusNotFound)
+		return
+	}
+
+	err = r.ParseForm()
+	if err != nil {
+		http.Error(w, "could not parse configuration", http.StatusBadRequest)
+		log.Printf("error parsing form in /info: %v", err)
+		return
+	}
+
+	newConf, err := NewConfigurationFromForm(r)
+
+	if err != nil {
+		http.Error(w, "could not parse configuration", http.StatusBadRequest)
+		log.Printf("error decoding form in /info: %v", err)
+		return
+	}
+
+	// send the configuration
+	log.Printf("sending updated configuration to %v:\n%v", gh, newConf)
+
+	err = gh.pushConfiguration(newConf)
+	if err != nil {
+		http.Error(w, "could not push configuration", http.StatusBadRequest)
+		log.Printf("error while sending configuration: %v", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (sv *Supervisor) infoHandler(w http.ResponseWriter, r *http.Request) {
+	queryValues := r.URL.Query()
 
 	ghId, err := strconv.ParseUint(queryValues.Get("id"), 0, 64)
 	if err != nil {
@@ -149,11 +171,6 @@ func (sv *Supervisor) infoHandler(w http.ResponseWriter, r *http.Request) {
 	sv.mutex.Lock()
 	gh, ok := sv.greenhouses[ghId]
 	sv.mutex.Unlock()
-
-	if !ok {
-		http.Error(w, "404 not found.", http.StatusNotFound)
-		return
-	}
 
 	if !ok {
 		// not in accepted greenhouses, might be pending
